@@ -3,6 +3,7 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\DeviceConfigController;
+use App\Http\Controllers\Api\TapController;
 
 /*
 |--------------------------------------------------------------------------
@@ -21,4 +22,5 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 
 Route::middleware('device.key')->prefix('device')->group(function () {
     Route::get('config', DeviceConfigController::class);
+      Route::post('tap', TapController::class);
 });

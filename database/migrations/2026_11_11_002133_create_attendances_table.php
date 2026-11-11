@@ -12,8 +12,16 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('attendances', function (Blueprint $table) {
-            $table->id();
-            $table->timestamps();
+                $table->id();
+        $table->foreignId('student_id')->constrained()->cascadeOnDelete();
+        $table->date('date');
+        $table->dateTime('checked_in_at');
+        $table->dateTime('checked_out_at')->nullable();
+        $table->string('status'); // hadir | terlambat
+        $table->foreignId('device_id')->nullable()->constrained()->nullOnDelete();
+        $table->timestamps();
+
+        $table->unique(['student_id', 'date']);
         });
     }
 

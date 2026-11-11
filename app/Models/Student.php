@@ -11,4 +11,9 @@ class Student extends Model
 
     protected $guarded = [];
     protected $casts = ['is_active' => 'boolean'];
+
+    public function attendances(): \Illuminate\Database\Eloquent\Relations\HasMany
+{
+    return $this->hasMany(Attendance::class);
+}
 }
