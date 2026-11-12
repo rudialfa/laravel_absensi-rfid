@@ -16,4 +16,9 @@ class Student extends Model
 {
     return $this->hasMany(Attendance::class);
 }
+
+    public function guardians(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'guardian_student');
+}
 }
