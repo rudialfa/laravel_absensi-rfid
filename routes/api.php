@@ -1,26 +1,30 @@
 <?php
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Api\AttendanceController;
+use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceConfigController;
+use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\TapController;
+use Illuminate\Support\Facades\Route;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider and all of them will
-| be assigned to the "api" middleware group. Make something great!
-|
-*/
-
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
-});
-
+// ---- Perangkat ESP32 (pakai X-Device-Key) ----
 Route::middleware('device.key')->prefix('device')->group(function () {
     Route::get('config', DeviceConfigController::class);
-      Route::post('tap', TapController::class);
+    Route::post('tap', TapController::class);
+});
+
+// ---- Aplikasi (Sanctum) ----
+Route::post('login', [AuthController::class, 'login'])->middleware('throttle:10,1');
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('me', [AuthController::class, 'me']);
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('device-tokens', [DeviceTokenController::class, 'store']);
+
+    Route::get('attendances', [AttendanceController::class, 'index'])
+        ->middleware('role:admin,guardian');
+
+    // Sementara: penguji pembatasan role
+    Route::get('admin/ping', fn() => response()->json(['success' => true, 'message' => 'pong']))
+        ->middleware('role:admin');
 });
