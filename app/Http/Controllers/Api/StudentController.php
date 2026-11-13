@@ -3,11 +3,13 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClassRoom;
 use App\Models\Setting;
 use App\Models\Student;
 use App\Services\CardToken;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
@@ -15,7 +17,7 @@ class StudentController extends Controller
 {
     public function index(Request $request)
     {
-        $query = Student::query()->orderBy('name');
+        $query = Student::with('classRoom')->orderBy('name');
 
         if ($request->filled('q')) {
             $q = $request->query('q');
@@ -54,7 +56,8 @@ class StudentController extends Controller
 
         $v = Validator::make($input, [
             'name'     => ['required', 'string', 'max:100'],
-            'class'    => ['required', 'string', 'max:20'],
+            'class_id' => ['required_without:class', 'nullable', 'integer', 'exists:classes,id'],
+            'class'    => ['required_without:class_id', 'nullable', 'string', 'max:50'],
             'rfid_uid' => ['required', 'string', 'regex:/^[0-9A-F]{8}$/'],
         ]);
 
@@ -86,9 +89,13 @@ class StudentController extends Controller
             ], 422);
         }
 
+        // Kelas baru dibuat hanya setelah semua pengecekan lolos
+        $classRoom = $this->resolveClass($input);
+
         $student = Student::create([
             'name'            => $input['name'],
-            'class'           => $input['class'],
+            'class'           => $classRoom->name,
+            'class_id'        => $classRoom->id,
             'rfid_uid'        => $input['rfid_uid'],
             'card_token_hash' => $hash,
             'is_active'       => true,
@@ -110,7 +117,8 @@ class StudentController extends Controller
         // Sengaja hanya field ini. rfid_uid diubah lewat replaceCard().
         $v = Validator::make($request->all(), [
             'name'      => ['sometimes', 'required', 'string', 'max:100'],
-            'class'     => ['sometimes', 'required', 'string', 'max:20'],
+            'class_id'  => ['sometimes', 'required', 'integer', 'exists:classes,id'],
+            'class'     => ['sometimes', 'required', 'string', 'max:50'],
             'is_active' => ['sometimes', 'required', 'boolean'],
         ]);
 
@@ -123,7 +131,17 @@ class StudentController extends Controller
             ], 422);
         }
 
-        $student->fill($v->validated())->save();
+        $data = $v->validated();
+
+        $student->fill(Arr::only($data, ['name', 'is_active']));
+
+        if (isset($data['class_id']) || isset($data['class'])) {
+            $classRoom = $this->resolveClass($data);
+            $student->class_id = $classRoom->id;
+            $student->class    = $classRoom->name;
+        }
+
+        $student->save();
 
         return response()->json([
             'success' => true,
@@ -206,12 +224,23 @@ class StudentController extends Controller
         ]);
     }
 
+    /** class_id lebih diutamakan. Kalau hanya nama, kelas dicari (atau dibuat) dari nama. */
+    private function resolveClass(array $input): ClassRoom
+    {
+        if (!empty($input['class_id'])) {
+            return ClassRoom::findOrFail($input['class_id']);
+        }
+
+        return ClassRoom::findOrCreateByName($input['class']);
+    }
+
     private function data(Student $s): array
     {
         return [
             'id'        => $s->id,
             'name'      => $s->name,
-            'class'     => $s->class,
+            'class'     => $s->classRoom?->name ?? $s->class,
+            'class_id'  => $s->class_id,
             'rfid_uid'  => $s->rfid_uid,
             'is_active' => (bool) $s->is_active,
             'has_token' => $s->card_token_hash !== null,

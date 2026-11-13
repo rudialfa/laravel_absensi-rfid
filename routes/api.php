@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\DeviceConfigController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\EnrollController;
@@ -34,6 +35,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('students/{student}', [StudentController::class, 'show']);
         Route::put('students/{student}', [StudentController::class, 'update']);
         Route::post('students/{student}/replace-card', [StudentController::class, 'replaceCard']);
+
+        Route::get('classes', [ClassController::class, 'index']);
+        Route::post('classes', [ClassController::class, 'store']);
+        Route::get('classes/{classRoom}', [ClassController::class, 'show']);
+        Route::put('classes/{classRoom}', [ClassController::class, 'update']);
+        Route::delete('classes/{classRoom}', [ClassController::class, 'destroy']);
 
         Route::post('enroll/start', [EnrollController::class, 'start']);
         Route::get('enroll/status', [EnrollController::class, 'status']);
