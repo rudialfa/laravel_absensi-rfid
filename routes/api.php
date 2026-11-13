@@ -32,6 +32,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('students', [StudentController::class, 'store']);
         Route::get('students/{student}', [StudentController::class, 'show']);
         Route::put('students/{student}', [StudentController::class, 'update']);
+        Route::post('students/{student}/replace-card', [StudentController::class, 'replaceCard']);
 
         Route::post('enroll/start', [EnrollController::class, 'start']);
         Route::get('enroll/status', [EnrollController::class, 'status']);
