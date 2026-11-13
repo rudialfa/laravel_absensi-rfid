@@ -2,6 +2,9 @@
 
 namespace App\Providers;
 
+use App\Services\FirebasePushSender;
+use App\Services\LogPushSender;
+use App\Services\PushSender;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,12 +14,14 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        $this->app->bind(
-            \App\Services\PushSender::class,
-            \App\Services\LogPushSender::class,
+        // Pakai Firebase kalau file service account ada, kalau tidak pakai pengirim log
+        $this->app->bind(PushSender::class, function ($app) {
+            $path = base_path(env('FIREBASE_CREDENTIALS', 'storage/app/firebase/service-account.json'));
 
-        );
-        $this->app->bind(PushSender::class, LogPushSender::class);
+            return is_file($path)
+                ? $app->make(FirebasePushSender::class)
+                : $app->make(LogPushSender::class);
+        });
     }
 
     /**
