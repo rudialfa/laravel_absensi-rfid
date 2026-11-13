@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Student;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Validator;
 
 class TapController extends Controller
@@ -23,6 +24,26 @@ class TapController extends Controller
         }
 
         $uid = strtoupper($request->input('uid'));
+
+        // ---- Mode pendaftaran: tangkap UID, bukan absen ----
+        // pull() mengambil sekaligus menghapus, jadi hanya satu kartu yang tertangkap.
+        if (Cache::pull(EnrollController::KEY_ACTIVE)) {
+            $owner = Student::where('rfid_uid', $uid)->first();
+
+            Cache::put(EnrollController::KEY_CAPTURED, [
+                'uid'        => $uid,
+                'registered' => (bool) $owner,
+                'student'    => $owner?->name,
+                'is_active'  => $owner ? (bool) $owner->is_active : null,
+                'at'         => now()->toIso8601String(),
+            ], 120);
+
+            return response()->json([
+                'success' => true,
+                'code'    => 'ENROLL_CAPTURED',
+                'message' => 'Kartu dibaca (mode daftar)',
+            ]);
+        }
 
         // Hanya kartu terdaftar DAN siswa aktif
         $student = Student::where('rfid_uid', $uid)
