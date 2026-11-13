@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DeviceConfigController;
 use App\Http\Controllers\Api\DeviceTokenController;
+use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\TapController;
 use Illuminate\Support\Facades\Route;
 
@@ -23,6 +24,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('attendances', [AttendanceController::class, 'index'])
         ->middleware('role:admin,guardian');
+
+    // ---- Khusus admin ----
+    Route::middleware('role:admin')->group(function () {
+        Route::get('students', [StudentController::class, 'index']);
+        Route::post('students', [StudentController::class, 'store']);
+        Route::get('students/{student}', [StudentController::class, 'show']);
+        Route::put('students/{student}', [StudentController::class, 'update']);
+    });
 
     // Sementara: penguji pembatasan role
     Route::get('admin/ping', fn() => response()->json(['success' => true, 'message' => 'pong']))
