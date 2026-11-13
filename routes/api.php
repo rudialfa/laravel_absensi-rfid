@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('device.key')->prefix('device')->group(function () {
     Route::get('config', DeviceConfigController::class);
     Route::post('tap', TapController::class);
+    Route::post('enroll-confirm', [EnrollController::class, 'confirm']);
 });
 
 // ---- Aplikasi (Sanctum) ----

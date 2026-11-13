@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\Student;
+use App\Services\CardToken;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -73,12 +75,29 @@ class StudentController extends Controller
             ], 422);
         }
 
+        // Token terkonfirmasi dari hasil scan (kalau ada)
+        $hash = CardToken::peekConfirmedHash($input['rfid_uid']);
+
+        if ($hash === null && Setting::get('require_card_token', '0') === '1') {
+            return response()->json([
+                'success' => false,
+                'code'    => 'TOKEN_NOT_READY',
+                'message' => 'Kartu belum diberi token. Scan kartu dulu sampai token tercatat.',
+            ], 422);
+        }
+
         $student = Student::create([
-            'name'      => $input['name'],
-            'class'     => $input['class'],
-            'rfid_uid'  => $input['rfid_uid'],
-            'is_active' => true,
+            'name'            => $input['name'],
+            'class'           => $input['class'],
+            'rfid_uid'        => $input['rfid_uid'],
+            'card_token_hash' => $hash,
+            'is_active'       => true,
         ]);
+
+        if ($hash !== null) {
+            CardToken::discard();
+            Cache::forget(EnrollController::KEY_CAPTURED);
+        }
 
         return response()->json([
             'success' => true,
@@ -114,7 +133,8 @@ class StudentController extends Controller
 
     /**
      * Ganti kartu hilang. UID baru WAJIB berasal dari hasil scan (mode daftar),
-     * tidak bisa dikirim lewat body.
+     * tidak bisa dikirim lewat body. Token lama dihapus, token kartu baru dipasang
+     * kalau sudah terkonfirmasi.
      */
     public function replaceCard(Student $student)
     {
@@ -147,10 +167,21 @@ class StudentController extends Controller
             ], 422);
         }
 
+        $newHash = CardToken::peekConfirmedHash($newUid);
+
+        if ($newHash === null && Setting::get('require_card_token', '0') === '1') {
+            return response()->json([
+                'success' => false,
+                'code'    => 'TOKEN_NOT_READY',
+                'message' => 'Kartu belum diberi token. Scan kartu dulu sampai token tercatat.',
+            ], 422);
+        }
+
         $oldUid = $student->rfid_uid;
 
         try {
-            $student->rfid_uid = $newUid;
+            $student->rfid_uid        = $newUid;
+            $student->card_token_hash = $newHash; // token kartu lama tidak berlaku untuk kartu baru
             $student->save();
         } catch (QueryException $e) {
             // Dua admin mengganti ke UID yang sama bersamaan: salah satu kalah di UNIQUE
@@ -164,8 +195,9 @@ class StudentController extends Controller
             throw $e;
         }
 
-        // Hasil scan hanya boleh dipakai sekali
+        // Hasil scan dan token hanya boleh dipakai sekali
         Cache::forget(EnrollController::KEY_CAPTURED);
+        CardToken::discard();
 
         return response()->json([
             'success' => true,
@@ -182,6 +214,7 @@ class StudentController extends Controller
             'class'     => $s->class,
             'rfid_uid'  => $s->rfid_uid,
             'is_active' => (bool) $s->is_active,
+            'has_token' => $s->card_token_hash !== null,
         ];
     }
 }

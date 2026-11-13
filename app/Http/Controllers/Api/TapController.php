@@ -7,8 +7,10 @@ use App\Jobs\SendAttendanceNotification;
 use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\CardToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class TapController extends Controller
@@ -36,13 +38,22 @@ class TapController extends Controller
                 'student'    => $owner?->name,
                 'is_active'  => $owner ? (bool) $owner->is_active : null,
                 'at'         => now()->toIso8601String(),
-            ], 120);
+            ], EnrollController::CAPTURED_SECONDS);
 
-            return response()->json([
+            CardToken::discard();
+
+            $response = [
                 'success' => true,
                 'code'    => 'ENROLL_CAPTURED',
                 'message' => 'Kartu dibaca (mode daftar)',
-            ]);
+            ];
+
+            // Token hanya untuk kartu baru. Kartu milik murid lain tidak disentuh.
+            if (!$owner) {
+                $response['write_token'] = CardToken::issue($uid);
+            }
+
+            return response()->json($response);
         }
 
         // Hanya kartu terdaftar DAN siswa aktif
@@ -52,6 +63,23 @@ class TapController extends Controller
 
         if (!$student) {
             return $this->fail('CARD_NOT_FOUND', 'Kartu tidak terdaftar', 404);
+        }
+
+        // ---- Token kartu (anti clone) ----
+        $token = $request->input('token');
+        $token = (is_string($token) && preg_match('/^[0-9A-Fa-f]{32}$/', $token))
+            ? strtolower($token)
+            : null;
+
+        if ($student->card_token_hash !== null) {
+            // Kartu ini sudah bertoken: token wajib cocok, apa pun setelannya
+            if (!CardToken::matches($student->card_token_hash, $token)) {
+                Log::warning('Tap ditolak: token kartu tidak sah', ['uid' => $uid]);
+
+                return $this->fail('TOKEN_INVALID', 'Kartu tidak sah', 403);
+            }
+        } elseif (Setting::get('require_card_token', '0') === '1') {
+            return $this->fail('TOKEN_REQUIRED', 'Kartu perlu didaftarkan ulang', 403);
         }
 
         $now            = now(); // waktu resmi dari server
