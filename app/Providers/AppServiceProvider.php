@@ -11,7 +11,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(
+            \App\Services\PushSender::class,
+            \App\Services\LogPushSender::class,
+
+        );
+        $this->app->bind(PushSender::class, LogPushSender::class);
     }
 
     /**

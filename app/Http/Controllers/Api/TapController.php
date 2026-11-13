@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendAttendanceNotification;
 use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Student;
@@ -32,11 +33,11 @@ class TapController extends Controller
             return $this->fail('CARD_NOT_FOUND', 'Kartu tidak terdaftar', 404);
         }
 
-        $now           = now(); // waktu resmi dari server
-        $today         = $now->toDateString();
-        $hm            = $now->format('H:i');
-        $lateTime      = Setting::get('late_time', '07:15');
-        $checkoutStart = Setting::get('checkout_start', '12:00');
+        $now            = now(); // waktu resmi dari server
+        $today          = $now->toDateString();
+        $hm             = $now->format('H:i');
+        $lateTime       = Setting::get('late_time', '07:15');
+        $checkoutStart  = Setting::get('checkout_start', '12:00');
         $isCheckoutTime = $hm >= $checkoutStart;
 
         $attendance = Attendance::where('student_id', $student->id)
@@ -92,7 +93,8 @@ class TapController extends Controller
             ]);
         }
 
-        // TODO (tahap notifikasi): dispatch job FCM "sudah pulang" ke wali dan admin.
+        // Notifikasi pulang ke wali dan admin (dikirim setelah respons ke ESP32)
+        SendAttendanceNotification::dispatch($attendance->id, 'pulang')->afterResponse();
 
         return response()->json([
             'success' => true,
@@ -125,7 +127,8 @@ class TapController extends Controller
             throw $e;
         }
 
-        // TODO (tahap notifikasi): dispatch job FCM "sudah masuk" ke wali dan admin.
+        // Notifikasi masuk ke wali dan admin (dikirim setelah respons ke ESP32)
+        SendAttendanceNotification::dispatch($attendance->id, 'masuk')->afterResponse();
 
         return response()->json([
             'success' => true,
