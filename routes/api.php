@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\EnrollController;
 use App\Http\Controllers\Api\GuardianController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\TapController;
+use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,6 +50,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('teachers/{teacher}', [TeacherController::class, 'show']);
         Route::put('teachers/{teacher}', [TeacherController::class, 'update']);
         Route::post('teachers/{teacher}/replace-card', [TeacherController::class, 'replaceCard']);
+
+        Route::get('teacher-attendances', [TeacherAttendanceController::class, 'index']);
 
         Route::get('guardians', [GuardianController::class, 'index']);
         Route::post('guardians', [GuardianController::class, 'store']);

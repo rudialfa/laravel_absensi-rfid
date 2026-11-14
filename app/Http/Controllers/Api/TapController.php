@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAttendanceNotification;
+use App\Jobs\SendTeacherAttendanceNotification;
 use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Models\Teacher;
+use App\Models\TeacherAttendance;
 use App\Services\CardOwner;
 use App\Services\CardToken;
 use Illuminate\Http\Request;
@@ -59,25 +62,27 @@ class TapController extends Controller
             return response()->json($response);
         }
 
-        // Hanya kartu terdaftar DAN siswa aktif
-        // (kartu guru dikerjakan di tahap 4c, sementara dijawab CARD_NOT_FOUND)
-        $student = Student::where('rfid_uid', $uid)
-            ->where('is_active', true)
-            ->first();
+        // ---- Cari pemilik kartu: murid aktif, kalau tidak ada guru aktif ----
+        $student = Student::where('rfid_uid', $uid)->where('is_active', true)->first();
+        $teacher = $student
+            ? null
+            : Teacher::where('rfid_uid', $uid)->where('is_active', true)->first();
 
-        if (!$student) {
+        $person = $student ?? $teacher;
+
+        if (!$person) {
             return $this->fail('CARD_NOT_FOUND', 'Kartu tidak terdaftar', 404);
         }
 
-        // ---- Token kartu (anti clone) ----
+        // ---- Token kartu (anti clone), berlaku untuk murid dan guru ----
         $token = $request->input('token');
         $token = (is_string($token) && preg_match('/^[0-9A-Fa-f]{32}$/', $token))
             ? strtolower($token)
             : null;
 
-        if ($student->card_token_hash !== null) {
+        if ($person->card_token_hash !== null) {
             // Kartu ini sudah bertoken: token wajib cocok, apa pun setelannya
-            if (!CardToken::matches($student->card_token_hash, $token)) {
+            if (!CardToken::matches($person->card_token_hash, $token)) {
                 Log::warning('Tap ditolak: token kartu tidak sah', ['uid' => $uid]);
 
                 return $this->fail('TOKEN_INVALID', 'Kartu tidak sah', 403);
@@ -89,9 +94,15 @@ class TapController extends Controller
         $now            = now(); // waktu resmi dari server
         $today          = $now->toDateString();
         $hm             = $now->format('H:i');
-        $lateTime       = Setting::get('late_time', '07:15');
         $checkoutStart  = Setting::get('checkout_start', '12:00');
         $isCheckoutTime = $hm >= $checkoutStart;
+
+        if ($teacher) {
+            return $this->handleTeacher($request, $teacher, $now, $isCheckoutTime);
+        }
+
+        // =============== Alur murid ===============
+        $lateTime = Setting::get('late_time', '07:15');
 
         $attendance = Attendance::where('student_id', $student->id)
             ->where('date', $today)
@@ -146,8 +157,8 @@ class TapController extends Controller
             ]);
         }
 
-        // Notifikasi pulang ke wali dan admin (dikirim setelah respons ke ESP32)
-        SendAttendanceNotification::dispatch($attendance->id, 'pulang')->afterResponse();
+        // Notifikasi pulang ke wali dan admin (masuk antrean, diproses queue:work)
+        SendAttendanceNotification::dispatch($attendance->id, 'pulang');
 
         return response()->json([
             'success' => true,
@@ -180,14 +191,120 @@ class TapController extends Controller
             throw $e;
         }
 
-        // Notifikasi masuk ke wali dan admin (dikirim setelah respons ke ESP32)
-        SendAttendanceNotification::dispatch($attendance->id, 'masuk')->afterResponse();
+        // Notifikasi masuk ke wali dan admin (masuk antrean, diproses queue:work)
+        SendAttendanceNotification::dispatch($attendance->id, 'masuk');
 
         return response()->json([
             'success' => true,
             'code'    => 'OK',
             'student' => $student->name,
             'status'  => $attendance->status,
+            'time'    => $attendance->checked_in_at->format('H:i'),
+        ]);
+    }
+
+    // =============== Alur guru (tanpa status terlambat) ===============
+    private function handleTeacher(Request $request, Teacher $teacher, $now, bool $isCheckoutTime)
+    {
+        $attendance = TeacherAttendance::where('teacher_id', $teacher->id)
+            ->where('date', $now->toDateString())
+            ->first();
+
+        // ---- Belum ada absen masuk hari ini ----
+        if (!$attendance) {
+            if ($isCheckoutTime) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'BELUM_MASUK',
+                    'role'    => 'teacher',
+                    'student' => $teacher->name,
+                    'message' => 'Belum absen masuk',
+                ]);
+            }
+
+            return $this->teacherCheckIn($request, $teacher, $now);
+        }
+
+        // ---- Sudah pulang ----
+        if ($attendance->checked_out_at) {
+            return response()->json([
+                'success' => true,
+                'code'    => 'ALREADY_OUT',
+                'role'    => 'teacher',
+                'student' => $teacher->name,
+                'message' => 'Sudah absen pulang',
+            ]);
+        }
+
+        // ---- Sudah masuk, belum waktunya pulang ----
+        if (!$isCheckoutTime) {
+            return response()->json([
+                'success' => true,
+                'code'    => 'ALREADY',
+                'role'    => 'teacher',
+                'student' => $teacher->name,
+                'message' => 'Sudah absen',
+            ]);
+        }
+
+        // ---- Pulang (update bersyarat, tahan tap bersamaan) ----
+        $updated = TeacherAttendance::where('id', $attendance->id)
+            ->whereNull('checked_out_at')
+            ->update(['checked_out_at' => $now]);
+
+        if ($updated === 0) {
+            return response()->json([
+                'success' => true,
+                'code'    => 'ALREADY_OUT',
+                'role'    => 'teacher',
+                'student' => $teacher->name,
+                'message' => 'Sudah absen pulang',
+            ]);
+        }
+
+        // Notifikasi pulang ke admin (masuk antrean, diproses queue:work)
+        SendTeacherAttendanceNotification::dispatch($attendance->id, 'pulang');
+
+        return response()->json([
+            'success' => true,
+            'code'    => 'CHECKOUT_OK',
+            'role'    => 'teacher',
+            'student' => $teacher->name,
+            'time'    => $now->format('H:i'),
+        ]);
+    }
+
+    private function teacherCheckIn(Request $request, Teacher $teacher, $now)
+    {
+        try {
+            $attendance = TeacherAttendance::create([
+                'teacher_id'    => $teacher->id,
+                'date'          => $now->toDateString(),
+                'checked_in_at' => $now,
+                'device_id'     => $request->attributes->get('device')->id,
+            ]);
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Dua tap bersamaan: salah satu kalah di UNIQUE constraint
+            if ($e->getCode() === '23000') {
+                return response()->json([
+                    'success' => true,
+                    'code'    => 'ALREADY',
+                    'role'    => 'teacher',
+                    'student' => $teacher->name,
+                    'message' => 'Sudah absen',
+                ]);
+            }
+            throw $e;
+        }
+
+        // Notifikasi masuk ke admin (masuk antrean, diproses queue:work)
+        SendTeacherAttendanceNotification::dispatch($attendance->id, 'masuk');
+
+        return response()->json([
+            'success' => true,
+            'code'    => 'OK',
+            'role'    => 'teacher',
+            'student' => $teacher->name,
             'time'    => $attendance->checked_in_at->format('H:i'),
         ]);
     }

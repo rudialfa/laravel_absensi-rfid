@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Teacher extends Model
 {
@@ -22,5 +23,10 @@ class Teacher extends Model
     public function classes(): BelongsToMany
     {
         return $this->belongsToMany(ClassRoom::class, 'class_teacher', 'teacher_id', 'class_id');
+    }
+
+    public function attendances(): HasMany
+    {
+        return $this->hasMany(TeacherAttendance::class);
     }
 }
