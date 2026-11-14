@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AttendanceController;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\ClassAttendanceController;
 use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\DeviceConfigController;
 use App\Http\Controllers\Api\DeviceTokenController;
@@ -30,6 +31,14 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('attendances', [AttendanceController::class, 'index'])
         ->middleware('role:admin,guardian');
+
+    // ---- Guru ----
+    Route::get('my-classes', [ClassAttendanceController::class, 'myClasses'])
+        ->middleware('role:teacher');
+
+    // ---- Guru (hanya kelas yang diampu) dan admin (semua kelas) ----
+    Route::get('classes/{classRoom}/attendances', [ClassAttendanceController::class, 'show'])
+        ->middleware('role:admin,teacher');
 
     // ---- Khusus admin ----
     Route::middleware('role:admin')->group(function () {
