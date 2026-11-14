@@ -26,7 +26,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->input('email'))->first();
+        $user = User::where('email', strtolower(trim($request->input('email'))))->first();
 
         if (!$user || !Hash::check($request->input('password'), $user->password)) {
             return response()->json([
@@ -34,6 +34,18 @@ class AuthController extends Controller
                 'code'    => 'INVALID_CREDENTIALS',
                 'message' => 'Email atau password salah',
             ], 401);
+        }
+
+        // Guru yang dinonaktifkan tidak boleh masuk
+        if ($user->role === 'teacher') {
+            $teacher = $user->teacher;
+            if ($teacher && !$teacher->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'code'    => 'ACCOUNT_DISABLED',
+                    'message' => 'Akun dinonaktifkan. Hubungi admin.',
+                ], 403);
+            }
         }
 
         $token = $user->createToken('mobile')->plainTextToken;

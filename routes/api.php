@@ -6,8 +6,10 @@ use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\DeviceConfigController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\EnrollController;
+use App\Http\Controllers\Api\GuardianController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\TapController;
+use App\Http\Controllers\Api\TeacherController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Perangkat ESP32 (pakai X-Device-Key) ----
@@ -41,6 +43,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('classes/{classRoom}', [ClassController::class, 'show']);
         Route::put('classes/{classRoom}', [ClassController::class, 'update']);
         Route::delete('classes/{classRoom}', [ClassController::class, 'destroy']);
+
+        Route::get('teachers', [TeacherController::class, 'index']);
+        Route::post('teachers', [TeacherController::class, 'store']);
+        Route::get('teachers/{teacher}', [TeacherController::class, 'show']);
+        Route::put('teachers/{teacher}', [TeacherController::class, 'update']);
+        Route::post('teachers/{teacher}/replace-card', [TeacherController::class, 'replaceCard']);
+
+        Route::get('guardians', [GuardianController::class, 'index']);
+        Route::post('guardians', [GuardianController::class, 'store']);
+        Route::put('guardians/{guardian}', [GuardianController::class, 'update']);
+        Route::delete('guardians/{guardian}', [GuardianController::class, 'destroy']);
+
+        Route::post('users/{user}/reset-password', [GuardianController::class, 'resetPassword']);
 
         Route::post('enroll/start', [EnrollController::class, 'start']);
         Route::get('enroll/status', [EnrollController::class, 'status']);

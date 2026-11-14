@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassRoom;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\CardOwner;
 use App\Services\CardToken;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
@@ -70,11 +71,11 @@ class StudentController extends Controller
             ], 422);
         }
 
-        if (Student::where('rfid_uid', $input['rfid_uid'])->exists()) {
+        if (CardOwner::exists($input['rfid_uid'])) {
             return response()->json([
                 'success' => false,
                 'code'    => 'UID_TAKEN',
-                'message' => 'Kartu ini sudah dipakai murid lain',
+                'message' => 'Kartu ini sudah dipakai orang lain',
             ], 422);
         }
 
@@ -177,11 +178,11 @@ class StudentController extends Controller
         }
 
         // Cek ulang ke database (bukan percaya hasil scan), karena data bisa berubah sejak scan
-        if (Student::where('rfid_uid', $newUid)->exists()) {
+        if (CardOwner::exists($newUid)) {
             return response()->json([
                 'success' => false,
                 'code'    => 'UID_TAKEN',
-                'message' => 'Kartu ini sudah dipakai murid lain',
+                'message' => 'Kartu ini sudah dipakai orang lain',
             ], 422);
         }
 
@@ -207,7 +208,7 @@ class StudentController extends Controller
                 return response()->json([
                     'success' => false,
                     'code'    => 'UID_TAKEN',
-                    'message' => 'Kartu ini sudah dipakai murid lain',
+                    'message' => 'Kartu ini sudah dipakai orang lain',
                 ], 422);
             }
             throw $e;

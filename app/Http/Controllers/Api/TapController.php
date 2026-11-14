@@ -7,6 +7,7 @@ use App\Jobs\SendAttendanceNotification;
 use App\Models\Attendance;
 use App\Models\Setting;
 use App\Models\Student;
+use App\Services\CardOwner;
 use App\Services\CardToken;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -30,13 +31,15 @@ class TapController extends Controller
         // ---- Mode pendaftaran: tangkap UID, bukan absen ----
         // pull() mengambil sekaligus menghapus, jadi hanya satu kartu yang tertangkap.
         if (Cache::pull(EnrollController::KEY_ACTIVE)) {
-            $owner = Student::where('rfid_uid', $uid)->first();
+            $owner      = CardOwner::find($uid);
+            $ownerModel = $owner['model'] ?? null;
 
             Cache::put(EnrollController::KEY_CAPTURED, [
                 'uid'        => $uid,
-                'registered' => (bool) $owner,
-                'student'    => $owner?->name,
-                'is_active'  => $owner ? (bool) $owner->is_active : null,
+                'registered' => $owner !== null,
+                'owner_type' => $owner['type'] ?? null,
+                'student'    => $ownerModel?->name,
+                'is_active'  => $ownerModel ? (bool) $ownerModel->is_active : null,
                 'at'         => now()->toIso8601String(),
             ], EnrollController::CAPTURED_SECONDS);
 
@@ -48,8 +51,8 @@ class TapController extends Controller
                 'message' => 'Kartu dibaca (mode daftar)',
             ];
 
-            // Token hanya untuk kartu baru. Kartu milik murid lain tidak disentuh.
-            if (!$owner) {
+            // Token hanya untuk kartu baru. Kartu milik murid atau guru lain tidak disentuh.
+            if ($owner === null) {
                 $response['write_token'] = CardToken::issue($uid);
             }
 
@@ -57,6 +60,7 @@ class TapController extends Controller
         }
 
         // Hanya kartu terdaftar DAN siswa aktif
+        // (kartu guru dikerjakan di tahap 4c, sementara dijawab CARD_NOT_FOUND)
         $student = Student::where('rfid_uid', $uid)
             ->where('is_active', true)
             ->first();
