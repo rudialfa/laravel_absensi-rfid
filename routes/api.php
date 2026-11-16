@@ -5,9 +5,11 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClassAttendanceController;
 use App\Http\Controllers\Api\ClassController;
 use App\Http\Controllers\Api\DeviceConfigController;
+use App\Http\Controllers\Api\DeviceController;
 use App\Http\Controllers\Api\DeviceTokenController;
 use App\Http\Controllers\Api\EnrollController;
 use App\Http\Controllers\Api\GuardianController;
+use App\Http\Controllers\Api\SettingController;
 use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\TapController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
@@ -68,6 +70,15 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::delete('guardians/{guardian}', [GuardianController::class, 'destroy']);
 
         Route::post('users/{user}/reset-password', [GuardianController::class, 'resetPassword']);
+
+        Route::get('settings', [SettingController::class, 'index']);
+        Route::put('settings', [SettingController::class, 'update']);
+
+        Route::get('devices', [DeviceController::class, 'index']);
+        Route::post('devices', [DeviceController::class, 'store']);
+        Route::put('devices/{device}', [DeviceController::class, 'update']);
+        Route::post('devices/{device}/rotate-key', [DeviceController::class, 'rotateKey']);
+        Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
 
         Route::post('enroll/start', [EnrollController::class, 'start']);
         Route::get('enroll/status', [EnrollController::class, 'status']);
