@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\SchoolCacheKey;
 use App\Http\Controllers\Controller;
 use App\Jobs\SendAttendanceNotification;
 use App\Jobs\SendTeacherAttendanceNotification;
@@ -33,13 +34,16 @@ class TapController extends Controller
 
         // ---- Mode pendaftaran: tangkap UID, bukan absen ----
         // pull() mengambil sekaligus menghapus, jadi hanya satu kartu yang tertangkap.
-        if (Cache::pull(EnrollController::KEY_ACTIVE)) {
+        if (Cache::pull(SchoolCacheKey::for(EnrollController::KEY_ACTIVE))) {
             $owner      = CardOwner::find($uid);
             $ownerModel = $owner['model'] ?? null;
+            // Kartu milik sekolah lain tidak terlihat (find hanya sekolah ini), tapi UID-nya tetap terpakai
+            $otherSchool = $owner === null && CardOwner::exists($uid);
 
-            Cache::put(EnrollController::KEY_CAPTURED, [
+            Cache::put(SchoolCacheKey::for(EnrollController::KEY_CAPTURED), [
                 'uid'        => $uid,
-                'registered' => $owner !== null,
+                'registered' => $owner !== null || $otherSchool,
+                'other_school' => $otherSchool,
                 'owner_type' => $owner['type'] ?? null,
                 'student'    => $ownerModel?->name,
                 'is_active'  => $ownerModel ? (bool) $ownerModel->is_active : null,
@@ -55,7 +59,7 @@ class TapController extends Controller
             ];
 
             // Token hanya untuk kartu baru. Kartu milik murid atau guru lain tidak disentuh.
-            if ($owner === null) {
+            if ($owner === null && !$otherSchool) {
                 $response['write_token'] = CardToken::issue($uid);
             }
 

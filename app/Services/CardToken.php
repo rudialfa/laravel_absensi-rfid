@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\SchoolCacheKey;
 use Illuminate\Support\Facades\Cache;
 
 /**
@@ -12,6 +13,12 @@ class CardToken
 {
     public const KEY     = 'enroll:token';
     public const SECONDS = 300;
+
+    /** Kunci Cache milik sekolah aktif. */
+    private static function key(): string
+    {
+        return SchoolCacheKey::for(self::KEY);
+    }
 
     /**
      * Buat token baru untuk UID, kembalikan token mentah (hex 32 karakter).
@@ -26,7 +33,7 @@ class CardToken
 
         $plain = bin2hex(random_bytes(16));
 
-        Cache::put(self::KEY, [
+        Cache::put(self::key(), [
             'uid'       => $uid,
             'hash'      => self::hash($plain),
             'confirmed' => false,
@@ -38,14 +45,14 @@ class CardToken
     /** ESP32 melapor token sudah tertulis di kartu. */
     public static function confirm(string $uid): bool
     {
-        $pending = Cache::get(self::KEY);
+        $pending = Cache::get(self::key());
 
         if (!is_array($pending) || ($pending['uid'] ?? null) !== $uid) {
             return false;
         }
 
         $pending['confirmed'] = true;
-        Cache::put(self::KEY, $pending, self::SECONDS);
+        Cache::put(self::key(), $pending, self::SECONDS);
 
         return true;
     }
@@ -53,7 +60,7 @@ class CardToken
     /** Hash token yang sudah terkonfirmasi untuk UID ini, atau null. */
     public static function peekConfirmedHash(string $uid): ?string
     {
-        $pending = Cache::get(self::KEY);
+        $pending = Cache::get(self::key());
 
         if (
             is_array($pending)
@@ -68,13 +75,13 @@ class CardToken
 
     public static function discard(): void
     {
-        Cache::forget(self::KEY);
+        Cache::forget(self::key());
     }
 
     /** Status untuk admin. Tidak pernah memuat token atau hash. */
     public static function publicStatus(): ?array
     {
-        $pending = Cache::get(self::KEY);
+        $pending = Cache::get(self::key());
 
         if (!is_array($pending)) {
             return null;

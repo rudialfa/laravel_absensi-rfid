@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\SchoolCacheKey;
 use App\Http\Controllers\Controller;
 use App\Models\ClassRoom;
 use App\Models\Setting;
@@ -104,7 +105,7 @@ class StudentController extends Controller
 
         if ($hash !== null) {
             CardToken::discard();
-            Cache::forget(EnrollController::KEY_CAPTURED);
+            Cache::forget(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
         }
 
         return response()->json([
@@ -157,7 +158,7 @@ class StudentController extends Controller
      */
     public function replaceCard(Student $student)
     {
-        $captured = Cache::get(EnrollController::KEY_CAPTURED);
+        $captured = Cache::get(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
 
         if (!is_array($captured) || empty($captured['uid'])) {
             return response()->json([
@@ -215,7 +216,7 @@ class StudentController extends Controller
         }
 
         // Hasil scan dan token hanya boleh dipakai sekali
-        Cache::forget(EnrollController::KEY_CAPTURED);
+        Cache::forget(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
         CardToken::discard();
 
         return response()->json([

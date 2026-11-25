@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Support\SchoolCacheKey;
 use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Models\Teacher;
@@ -111,7 +112,7 @@ class TeacherController extends Controller
 
         if ($hash !== null) {
             CardToken::discard();
-            Cache::forget(EnrollController::KEY_CAPTURED);
+            Cache::forget(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
         }
 
         $teacher->load(['user', 'classes']);
@@ -169,7 +170,7 @@ class TeacherController extends Controller
      */
     public function replaceCard(Teacher $teacher)
     {
-        $captured = Cache::get(EnrollController::KEY_CAPTURED);
+        $captured = Cache::get(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
 
         if (!is_array($captured) || empty($captured['uid'])) {
             return $this->fail('NO_SCAN', 'Belum ada kartu baru yang di-scan. Tekan "Scan kartu" lalu tempelkan kartu.', 422);
@@ -204,7 +205,7 @@ class TeacherController extends Controller
             throw $e;
         }
 
-        Cache::forget(EnrollController::KEY_CAPTURED);
+        Cache::forget(SchoolCacheKey::for(EnrollController::KEY_CAPTURED));
         CardToken::discard();
 
         $teacher->load(['user', 'classes']);
