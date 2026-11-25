@@ -13,9 +13,17 @@ class CardToken
     public const KEY     = 'enroll:token';
     public const SECONDS = 300;
 
-    /** Buat token baru untuk UID, kembalikan token mentah (hex 32 karakter). */
+    /**
+     * Buat token baru untuk UID, kembalikan token mentah (hex 32 karakter).
+     * Kartu yang sudah terdaftar di sekolah mana pun tidak diberi token baru
+     * (string kosong), supaya kartu sekolah lain tidak tertimpa.
+     */
     public static function issue(string $uid): string
     {
+        if (CardOwner::exists($uid)) {
+            return '';
+        }
+
         $plain = bin2hex(random_bytes(16));
 
         Cache::put(self::KEY, [

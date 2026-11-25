@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToSchool;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -9,6 +10,8 @@ use Illuminate\Database\QueryException;
 
 class ClassRoom extends Model
 {
+    use BelongsToSchool;
+
     protected $table = 'classes';
 
     protected $guarded = [];
@@ -28,7 +31,7 @@ class ClassRoom extends Model
         return trim(preg_replace('/\s+/', ' ', $name));
     }
 
-    /** Cari kelas dari nama, tanpa membedakan huruf besar kecil. */
+    /** Cari kelas dari nama (di sekolah aktif), tanpa membedakan huruf besar kecil. */
     public static function findByName(string $name): ?self
     {
         return static::whereRaw('LOWER(name) = ?', [mb_strtolower(static::normalize($name))])->first();

@@ -41,8 +41,12 @@ class SendTeacherAttendanceNotification implements ShouldQueue
             $body = "{$name} (guru) sudah pulang pukul " . $attendance->checked_out_at->format('H:i');
         }
 
-        // Penerima: hanya admin
-        $tokens = DeviceToken::whereIn('user_id', User::where('role', 'admin')->pluck('id'))
+        // Penerima: hanya admin sekolah yang sama
+        $adminIds = User::where('role', 'admin')
+            ->where('school_id', $attendance->school_id)
+            ->pluck('id');
+
+        $tokens = DeviceToken::whereIn('user_id', $adminIds)
             ->pluck('fcm_token')
             ->all();
 

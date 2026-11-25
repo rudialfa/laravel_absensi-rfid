@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DeviceToken;
+use App\Models\School;
+use App\Models\Teacher;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -26,7 +28,10 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', strtolower(trim($request->input('email'))))->first();
+        // Belum ada sekolah aktif saat login, jadi cari tanpa filter sekolah
+        $user = User::withoutGlobalScopes()
+            ->where('email', strtolower(trim($request->input('email'))))
+            ->first();
 
         if (!$user || !Hash::check($request->input('password'), $user->password)) {
             return response()->json([
@@ -36,15 +41,24 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // Selain super_admin, akun harus terhubung ke sekolah yang aktif
+        $school = $user->school_id ? School::find($user->school_id) : null;
+
+        if ($user->role !== 'super_admin') {
+            if (!$school) {
+                return $this->fail('NO_SCHOOL', 'Akun belum terhubung ke sekolah', 403);
+            }
+
+            if (!$school->is_active) {
+                return $this->fail('SCHOOL_DISABLED', 'Sekolah dinonaktifkan. Hubungi pengelola.', 403);
+            }
+        }
+
         // Guru yang dinonaktifkan tidak boleh masuk
         if ($user->role === 'teacher') {
-            $teacher = $user->teacher;
+            $teacher = Teacher::withoutGlobalScopes()->where('user_id', $user->id)->first();
             if ($teacher && !$teacher->is_active) {
-                return response()->json([
-                    'success' => false,
-                    'code'    => 'ACCOUNT_DISABLED',
-                    'message' => 'Akun dinonaktifkan. Hubungi admin.',
-                ], 403);
+                return $this->fail('ACCOUNT_DISABLED', 'Akun dinonaktifkan. Hubungi admin.', 403);
             }
         }
 
@@ -53,15 +67,17 @@ class AuthController extends Controller
         return response()->json([
             'success' => true,
             'token'   => $token,
-            'user'    => $this->userData($user),
+            'user'    => $this->userData($user, $school),
         ]);
     }
 
     public function me(Request $request)
     {
+        $user = $request->user();
+
         return response()->json([
             'success' => true,
-            'user'    => $this->userData($request->user()),
+            'user'    => $this->userData($user, $user->school_id ? School::find($user->school_id) : null),
         ]);
     }
 
@@ -81,13 +97,24 @@ class AuthController extends Controller
         return response()->json(['success' => true]);
     }
 
-    private function userData(User $user): array
+    private function userData(User $user, ?School $school): array
     {
         return [
-            'id'    => $user->id,
-            'name'  => $user->name,
-            'email' => $user->email,
-            'role'  => $user->role,
+            'id'        => $user->id,
+            'name'      => $user->name,
+            'email'     => $user->email,
+            'role'      => $user->role,
+            'school_id' => $school?->id,
+            'school'    => $school?->name,
         ];
+    }
+
+    private function fail(string $code, string $message, int $http)
+    {
+        return response()->json([
+            'success' => false,
+            'code'    => $code,
+            'message' => $message,
+        ], $http);
     }
 }

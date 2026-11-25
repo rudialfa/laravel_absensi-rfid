@@ -3,6 +3,8 @@
 namespace App\Http\Middleware;
 
 use App\Models\Device;
+use App\Models\School;
+use App\Support\SchoolContext;
 use Closure;
 use Illuminate\Http\Request;
 
@@ -12,8 +14,9 @@ class DeviceKey
     {
         $key = $request->header('X-Device-Key');
 
+        // Tanpa filter sekolah: sekolahnya baru diketahui dari perangkat ini
         $device = $key
-            ? Device::where('api_key_hash', hash('sha256', $key))->first()
+            ? Device::withoutGlobalScopes()->where('api_key_hash', hash('sha256', $key))->first()
             : null;
 
         if (!$device) {
@@ -24,8 +27,23 @@ class DeviceKey
             ], 401);
         }
 
-        $request->attributes->set('device', $device);
+        $school = $device->school_id ? School::find($device->school_id) : null;
 
-        return $next($request);
+        if (!$school || !$school->is_active) {
+            return response()->json([
+                'success' => false,
+                'code' => 'SCHOOL_DISABLED',
+                'message' => 'Sekolah tidak aktif',
+            ], 403);
+        }
+
+        $request->attributes->set('device', $device);
+        SchoolContext::set($school->id);
+
+        try {
+            return $next($request);
+        } finally {
+            SchoolContext::clear();
+        }
     }
 }

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Services\FirebasePushSender;
 use App\Services\LogPushSender;
 use App\Services\PushSender;
+use App\Support\SchoolPresenceVerifier;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -21,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
             return is_file($path)
                 ? $app->make(FirebasePushSender::class)
                 : $app->make(LogPushSender::class);
+        });
+
+        // Aturan exists:students,id dan sejenisnya hanya melihat data sekolah aktif
+        $this->app->extend('validation.presence', function ($verifier, $app) {
+            return new SchoolPresenceVerifier($app['db']);
         });
     }
 

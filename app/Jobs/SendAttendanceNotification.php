@@ -32,9 +32,13 @@ class SendAttendanceNotification implements ShouldQueue
 
         $student = $attendance->student;
 
-        // Penerima: wali murid ini + semua admin
+        // Penerima: wali murid ini + admin SEKOLAH YANG SAMA
+        $adminIds = User::where('role', 'admin')
+            ->where('school_id', $attendance->school_id)
+            ->pluck('id');
+
         $userIds = $student->guardians->pluck('id')
-            ->merge(User::where('role', 'admin')->pluck('id'))
+            ->merge($adminIds)
             ->unique();
 
         $tokens = DeviceToken::whereIn('user_id', $userIds)->pluck('fcm_token')->all();
