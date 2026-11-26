@@ -160,7 +160,17 @@ class TestSchoolEnroll extends Command
 
         $options = $method === 'GET' ? ['query' => $data] : ['json' => $data];
 
-        return $req->send($method, $this->base . $path, $options);
+        $res = $req->send($method, $this->base . $path, $options);
+
+        // Batas login 10 per menit: tunggu sesuai Retry-After, lalu ulangi sekali
+        if ($res->status() === 429) {
+            $tunggu = max(1, min((int) $res->header('Retry-After'), 65));
+            $this->warn("Batas percobaan tercapai, menunggu {$tunggu} detik...");
+            sleep($tunggu + 1);
+            $res = $req->send($method, $this->base . $path, $options);
+        }
+
+        return $res;
     }
 
     private function cek(string $nama, bool $ok): void

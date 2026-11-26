@@ -14,11 +14,14 @@ use App\Http\Controllers\Api\StudentController;
 use App\Http\Controllers\Api\TapController;
 use App\Http\Controllers\Api\TeacherAttendanceController;
 use App\Http\Controllers\Api\TeacherController;
+use App\Http\Controllers\Api\DeviceCardKeyController;
+use App\Http\Controllers\Api\SuperController;
 use Illuminate\Support\Facades\Route;
 
 // ---- Perangkat ESP32 (pakai X-Device-Key) ----
 Route::middleware('device.key')->prefix('device')->group(function () {
     Route::get('config', DeviceConfigController::class);
+    Route::get('card-key', DeviceCardKeyController::class);
     Route::post('tap', TapController::class);
     Route::post('enroll-confirm', [EnrollController::class, 'confirm']);
 });
@@ -83,6 +86,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('enroll/start', [EnrollController::class, 'start']);
         Route::get('enroll/status', [EnrollController::class, 'status']);
         Route::post('enroll/cancel', [EnrollController::class, 'cancel']);
+    });
+
+    // ---- Khusus super admin (pengelola sistem) ----
+    Route::middleware('role:super_admin')->prefix('super')->group(function () {
+        Route::get('schools', [SuperController::class, 'index']);
+        Route::post('schools', [SuperController::class, 'store']);
+        Route::put('schools/{school}', [SuperController::class, 'update']);
+        Route::get('schools/{school}/admins', [SuperController::class, 'admins']);
+        Route::post('schools/{school}/admins', [SuperController::class, 'storeAdmin']);
+        Route::post('schools/{school}/card-key/rotate', [SuperController::class, 'rotateCardKey']);
+        Route::put('schools/{school}/card-key', [SuperController::class, 'setCardKey']);
+        Route::post('admins/{user}/reset-password', [SuperController::class, 'resetAdminPassword']);
     });
 
     // Sementara: penguji pembatasan role

@@ -10,7 +10,23 @@ use Illuminate\Database\Eloquent\Model;
  */
 class School extends Model
 {
+    /** Setelan awal untuk sekolah baru (sama dengan nilai bawaan SettingController). */
+    public const DEFAULT_SETTINGS = [
+        'late_time'          => '07:15',
+        'checkout_start'     => '12:00',
+        'cooldown_seconds'   => '10',
+        'lcd_idle'           => 'Tempel kartu',
+        'require_card_token' => '0',
+    ];
+
     protected $guarded = [];
 
-    protected $casts = ['is_active' => 'boolean'];
+    /** Kunci kartu tidak pernah ikut keluar lewat toArray atau JSON. */
+    protected $hidden = ['card_key'];
+
+    protected $casts = [
+        'is_active'           => 'boolean',
+        'card_key'            => 'encrypted',
+        'card_key_rotated_at' => 'datetime',
+    ];
 }
