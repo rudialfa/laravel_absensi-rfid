@@ -22,11 +22,12 @@ class School extends Model
     protected $guarded = [];
 
     /** Kunci kartu tidak pernah ikut keluar lewat toArray atau JSON. */
-    protected $hidden = ['card_key'];
+    protected $hidden = ['card_key', 'card_key_previous'];
 
     protected $casts = [
         'is_active'           => 'boolean',
         'card_key'            => 'encrypted',
+        'card_key_previous'   => 'encrypted',
         'card_key_rotated_at' => 'datetime',
     ];
 }

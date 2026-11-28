@@ -27,7 +27,12 @@ class DeviceCardKeyController extends Controller
         }
 
         return response()
-            ->json(['success' => true, 'card_key' => $key])
+            ->json([
+                'success'           => true,
+                'card_key'          => $key,
+                // Kunci sebelum putaran terakhir (null kalau belum pernah diganti)
+                'previous_card_key' => $school->card_key_previous,
+            ])
             ->header('Cache-Control', 'no-store');
     }
 }

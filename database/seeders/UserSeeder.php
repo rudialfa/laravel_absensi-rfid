@@ -14,6 +14,7 @@ class UserSeeder extends Seeder
     {
         $passAdmin = Str::random(12);
         $passWali  = Str::random(12);
+        $passSuper = Str::random(12);
 
         $admin = User::updateOrCreate(
             ['email' => 'admin@contoh.test'],
@@ -25,6 +26,12 @@ class UserSeeder extends Seeder
             ['name' => 'Wali Contoh', 'role' => 'guardian', 'password' => Hash::make($passWali)]
         );
 
+        // Pengelola sistem: tanpa sekolah, hanya bisa membuat dan mengelola sekolah
+        User::updateOrCreate(
+            ['email' => 'super@contoh.test'],
+            ['name' => 'Pengelola', 'role' => 'super_admin', 'password' => Hash::make($passSuper)]
+        );
+
         // Hubungkan wali ke siswa pertama yang ada
         if ($student = Student::first()) {
             $wali->students()->syncWithoutDetaching([$student->id]);
@@ -32,6 +39,7 @@ class UserSeeder extends Seeder
 
         $this->command->warn("Password admin : {$passAdmin}");
         $this->command->warn("Password wali  : {$passWali}");
+        $this->command->warn("Password super : {$passSuper}  (super@contoh.test)");
         $this->command->warn('Catat sekarang, tidak ditampilkan lagi. Jangan kirim ke chat.');
     }
 }

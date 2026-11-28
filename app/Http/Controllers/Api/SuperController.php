@@ -202,6 +202,8 @@ class SuperController extends Controller
     public function rotateCardKey(School $school)
     {
         $school->update([
+            // Kunci lama tetap dikenali ESP32 sampai putaran berikutnya
+            'card_key_previous'   => $school->card_key,
             'card_key'            => CardKey::generate(),
             'card_key_rotated_at' => now(),
         ]);
@@ -219,10 +221,16 @@ class SuperController extends Controller
             return $this->fail('VALIDATION', $problem, 422);
         }
 
-        $school->update([
-            'card_key'            => strtoupper($key),
-            'card_key_rotated_at' => now(),
-        ]);
+        $baru = strtoupper($key);
+
+        // Kunci yang sama dengan yang sekarang: tidak ada yang berubah
+        if ($school->card_key !== $baru) {
+            $school->update([
+                'card_key_previous'   => $school->card_key, // null kalau baru pertama diatur
+                'card_key'            => $baru,
+                'card_key_rotated_at' => now(),
+            ]);
+        }
 
         return response()->json(['success' => true, 'data' => $this->summary($school->fresh())]);
     }
